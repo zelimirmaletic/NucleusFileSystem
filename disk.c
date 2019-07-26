@@ -6,16 +6,30 @@
 
 #include "disk.h"
 
-//Here we define global constants
-static FILE *stream;
+//GLOBAL CONSTANTS
+static FILE *stream = 0;
+static FILE *streamBackup = 0;
+//Kepp track of basic disk data and I/O operations
 static int numberOfBlocks = 0;
 static int numberOfReads = 0;
 static int numberOfWrites = 0;
 
+/*
+*******************NOTE ABOUT EMULATED DISK SECURITY******************************
+-This emulation of physical hard drive has a built-in security.
+-Security is achieved using RAID1.
+-In this implementation we have only one backup drive(binary file), whereas in
+practice there can be multiple backup hard drvies.
+-This security implementation has more explanatory than practical purpose.
+-In implemetation of functions there will be commented which part of each function
+is responsible for RAID1 implementation.
+**********************************************************************************
+*/
+
 
 int diskInitialize(const char *fileName, int number)
 {
-    if( (number<0) | (number>20e6) )
+    if( (number<0) | (number>4e6) )
     {
         printf("ERROR: Maximal disk size is 20 MB!\n");
         printf("ERROR: Allocation failure!\n");
@@ -26,16 +40,39 @@ int diskInitialize(const char *fileName, int number)
         stream = fopen(fileName,"w+");
     if(!stream)
         return 0;
-    //ftruncate() - function that shortend file to desired length
-    //fileno() -  it shall return the integer file descriptor associated with the stream pointed to by stream
-    ftruncate(fileno(stream), number*DISK_BLOCK_SIZE);
     numberOfBlocks = number;
+    //ftruncate() - Function that shortens file to desired length
+    //fileno() -  It shall return the integer file descriptor associated with the stream pointed to by stream
+    ftruncate(fileno(stream), numberOfBlocks*DISK_BLOCK_SIZE);
+
+    //******************RAID1 IMPLEMENTATION*************************
+    streamBackup = fopen("BackupDisk.bin","r+");
+    if (!streamBackup)
+        streamBackup = fopen("BackupDisk.bin","w+");
+    if(!streamBackup)
+        return 0;
+    ftruncate(fileno(streamBackup), numberOfBlocks*DISK_BLOCK_SIZE);
+    //***************************************************************
     return 1;
 }
 
+//Functions for determining disk size
 int diskSize()
 {
     return numberOfBlocks;
+}
+
+int diskSizeB()
+{
+    return numberOfBlocks*5;
+}
+float diskSizeKB()
+{
+    return (numberOfBlocks*5)/10e3;
+}
+float diskSizeKiB()
+{
+    return (numberOfBlocks*5)/1024.00;
 }
 
 static void validityCheck(int blockNumber, const char *data)
@@ -57,11 +94,13 @@ static void validityCheck(int blockNumber, const char *data)
     }
 }
 
+//Basic I/O functions
+
 void diskRead(int blockNumber, char *data)
 {
     validityCheck(blockNumber, data);
+    rewind(stream);
     fseek(stream,blockNumber*DISK_BLOCK_SIZE,SEEK_SET);
-
     if(fread(data,DISK_BLOCK_SIZE,1,stream)==1)
         numberOfReads++;
     else
@@ -74,9 +113,8 @@ void diskRead(int blockNumber, char *data)
 void diskWrite(int blockNumber,const char *data)
 {
     validityCheck(blockNumber, data);
-
+    rewind(stream);
     fseek(stream, blockNumber*DISK_BLOCK_SIZE, SEEK_SET);
-
     if(fwrite(data, DISK_BLOCK_SIZE, 1, stream)==1)
         numberOfWrites++;
     else
@@ -84,27 +122,48 @@ void diskWrite(int blockNumber,const char *data)
         printf("ERROR: Could not access emulated disk!\n Aborting...\n");
         abort();
     }
+
+    //*****************RAID1 IMPLEMENTATION******************************************************
+    rewind(streamBackup);
+    fseek(streamBackup,blockNumber*DISK_BLOCK_SIZE,SEEK_SET);
+    if(fwrite(data,DISK_BLOCK_SIZE,1,streamBackup)==1)
+        printf("");
+    else
+    {
+        printf("ERROR: Could not access emulated backup disk!\n Aborting...\n");
+    }
+    //*******************************************************************************************
+
 }
 
+//Formating and closing disk functions
 void diskFormat()
 {
     if(stream)
     {
         rewind(stream);
         char *buffer = calloc(numberOfBlocks*DISK_BLOCK_SIZE, sizeof(char));
-        fwrite(buffer,sizeof(char),(numberOfBlocks+1)*DISK_BLOCK_SIZE,stream);
+        fwrite(buffer,sizeof(char), numberOfBlocks*DISK_BLOCK_SIZE,stream);
     }
+    //NOTE: diskFormat() function does not remove data from backup drive!
 }
 
 void diskClose()
 {
     if(stream)
     {
-        printf("=======DISK STATISTICS=======\n");
+        printf("==========DISK STATISTICS==========\n");
         printf("NUMBER OF READS: %d\n", numberOfReads);
         printf("NUMBER OF WRITES: %d\n", numberOfWrites);
-        printf("=============================\n");
+        printf("===================================\n");
         fclose(stream);
-        stream = 0;
+        stream = NULL;
     }
+    //*******RAID1 IMPLEMENTATION*******************************
+    if(streamBackup)
+    {
+        fclose(streamBackup);
+        streamBackup = NULL;
+    }
+    //**********************************************************
 }
