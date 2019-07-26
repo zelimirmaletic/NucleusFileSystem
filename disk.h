@@ -7,7 +7,7 @@ int  diskInitialize( const char *fileName, int numberOfBlocks );
 int  diskSize();
 void diskRead( int blockNumber, char *data );
 void diskWrite( int blockNumber, const char *data );
-void diskFormat();//clear all data from disk!
+void diskFormat();//clear all data from disk--->HARD FORMAT!
 void diskClose();
 
 #endif // DISK_H_INCLUDED
