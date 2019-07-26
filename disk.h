@@ -15,7 +15,9 @@ float diskSizeKiB();
 void diskRead( int blockNumber, char *data );
 void diskWrite( int blockNumber, const char *data );
 //Formating and closing disk functions
-void diskFormat();//clear all data from disk--->HARD FORMAT!
+void diskFormat();//ROOT RIGHTS
 void diskClose();
+//RAID1 Implementation
+void switchToBackupDisk();//ROOT RIGHTS
 
 #endif // DISK_H_INCLUDED

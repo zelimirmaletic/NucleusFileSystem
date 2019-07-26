@@ -26,7 +26,7 @@ is responsible for RAID1 implementation.
 **********************************************************************************
 */
 
-
+//Called only at the first use of file system
 int diskInitialize(const char *fileName, int number)
 {
     if( (number<0) | (number>4e6) )
@@ -166,4 +166,11 @@ void diskClose()
         streamBackup = NULL;
     }
     //**********************************************************
+}
+
+
+//****************RAID1 IMPLEMENTATION********************
+void switchToBackupDisk()
+{
+    stream = streamBackup;
 }
