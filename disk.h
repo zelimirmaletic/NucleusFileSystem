@@ -2,8 +2,7 @@
 #define DISK_H_INCLUDED
 
 
-#define DISK_BLOCK_SIZE 5
-#define NULL 0
+#define DISK_BLOCK_SIZE 512
 
 int  diskInitialize( const char *fileName, int numberOfBlocks );
 float diskUsage();

@@ -10,12 +10,12 @@
 static FILE *stream = 0;
 static FILE *streamBackup = 0;
 //Kepp track of basic disk data and I/O operations
-static int numberOfBlocks = 0;
-static int numberOfReads = 0;
-static int numberOfWrites = 0;
+static unsigned int numberOfBlocks = 0;
+static unsigned int numberOfReads = 0;
+static unsigned int numberOfWrites = 0;
 
 /*
-*******************NOTE ABOUT EMULATED DISK-FAILURE SECURIT***********************
+*******************NOTE ABOUT EMULATED DISK-FAILURE SECURITY***********************
 -This emulation of physical hard drive has a built-in disk-failure security.
 -Security is achieved using RAID1.
 -In this implementation we have only one backup drive(binary file), whereas in
@@ -35,7 +35,7 @@ int diskInitialize(const char *fileName, int number)
         printf("ERROR: Allocation failure!\n");
         return 0;
     }
-    stream = fopen(fileName,"r+");
+    stream = fopen(fileName,"rb+");
     if (!stream)
         stream = fopen(fileName,"w+");
     if(!stream)
@@ -46,9 +46,9 @@ int diskInitialize(const char *fileName, int number)
     ftruncate(fileno(stream), numberOfBlocks*DISK_BLOCK_SIZE);
 
     //******************RAID1 IMPLEMENTATION*************************
-    streamBackup = fopen("BackupDisk.bin","r+");
+    streamBackup = fopen("BackupDisk.bin","rb+");
     if (!streamBackup)
-        streamBackup = fopen("BackupDisk.bin","w+");
+        streamBackup = fopen("BackupDisk.bin","wb+");
     if(!streamBackup)
         return 0;
     ftruncate(fileno(streamBackup), numberOfBlocks*DISK_BLOCK_SIZE);
@@ -59,9 +59,9 @@ int diskInitialize(const char *fileName, int number)
 //Determines true byte usage on emulated hard-drive expressed in percentiles
 float diskUsage()
 {
-    int counter = 0;
+    unsigned int counter = 0;
     int temp;
-    for(int i=0;i<numberOfBlocks*5;i++)
+    for(int i=0;i<numberOfBlocks*DISK_BLOCK_SIZE;i++)
     {
         temp = getc(stream);
         if(temp!=0)
@@ -69,7 +69,7 @@ float diskUsage()
     }
     rewind(stream);
     //Counter is now number of used B on hard-drive
-    float percentage = (float)counter/(numberOfBlocks*5);
+    float percentage = (float)counter/(numberOfBlocks*DISK_BLOCK_SIZE);
     return percentage*100;
 }
 
@@ -81,15 +81,15 @@ int diskSize()
 
 int diskSizeB()
 {
-    return numberOfBlocks*5;
+    return numberOfBlocks*DISK_BLOCK_SIZE;
 }
 float diskSizeKB()
 {
-    return (numberOfBlocks*5)/10e3;
+    return (numberOfBlocks*DISK_BLOCK_SIZE)/10e3;
 }
 float diskSizeKiB()
 {
-    return (numberOfBlocks*5)/1024.00;
+    return (numberOfBlocks*DISK_BLOCK_SIZE)/1024.00;
 }
 
 static void validityCheck(int blockNumber, const char *data)
@@ -132,10 +132,22 @@ void diskRead(int blockNumber, char *data)
 void diskWrite(int blockNumber,const char *data)
 {
     validityCheck(blockNumber, data);
+
+    //Find position in disk
     rewind(stream);
     fseek(stream, blockNumber*DISK_BLOCK_SIZE, SEEK_SET);
-    encrypt(data);
-    if(fwrite(data, DISK_BLOCK_SIZE, 1, stream)==1)
+
+    //Determine input data length
+    unsigned int length = 0;
+    for (length = 0; *(data+length) != '\0'; ++length);
+
+    //Allocate new temporary array
+    char *temp = calloc(DISK_BLOCK_SIZE,sizeof(char));
+    for(int i =0;i<length;++i)
+        temp[i] = data[i];
+    encrypt(temp);
+
+    if(fwrite(temp, DISK_BLOCK_SIZE, 1, stream)==1)
         numberOfWrites++;
     else
     {
@@ -146,13 +158,10 @@ void diskWrite(int blockNumber,const char *data)
     //*****************RAID1 IMPLEMENTATION******************************************************
     rewind(streamBackup);
     fseek(streamBackup,blockNumber*DISK_BLOCK_SIZE,SEEK_SET);
-    if(fwrite(data,DISK_BLOCK_SIZE,1,streamBackup)==1)
-        printf("");
-    else
-    {
-        printf("ERROR: Could not access emulated backup disk!\n Aborting...\n");
-    }
+    fwrite(temp, DISK_BLOCK_SIZE, 1, stream);
     //*******************************************************************************************
+    free(temp);
+    temp = NULL;
     rewind(stream);
 }
 
@@ -166,7 +175,7 @@ void diskFormat()
         fwrite(buffer,sizeof(char), numberOfBlocks*DISK_BLOCK_SIZE,stream);
     }
     rewind(stream);
-    //NOTE: diskFormat() function does not remove data from backup drive!
+    //NOTE: diskFormat() function does not remove data from backup drive!------> OR MAYBE IT SHOULD?
 }
 
 void diskClose()
@@ -204,10 +213,11 @@ void encrypt(char *data)
 {
     char temp;
     //Simple perturbation encryption algorithm
-    for(int i =0;i<DISK_BLOCK_SIZE;++i)
+    for(int i=0;i<DISK_BLOCK_SIZE;++i)
     {
         if(i%2==0)
         {
+            //pointer access is implemented for the sake of speed
             temp = *data;
             *data = *(data+i);
             *(data+i) = temp;
