@@ -3,8 +3,10 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <stdarg.h>
 
 #include "disk.h"
+#include "fileSystem.h"
 
 //GLOBAL CONSTANTS
 static FILE *stream = NULL;
@@ -26,8 +28,24 @@ is responsible for RAID1 implementation.
 **********************************************************************************
 */
 
+int diskOpen(const char *fileName)
+{
+    stream = fopen(fileName,"rb+");
+    if (!stream)
+        stream = fopen(fileName,"w+");
+    if(!stream)
+        return 0;
+    //************RAID1 IMPLEMENTATION****************
+    streamBackup = fopen("BackupDisk.bin","rb+");
+    if (!streamBackup)
+        streamBackup = fopen("BackupDisk.bin","wb+");
+    if(!streamBackup)
+        return 0;
+    //************************************************
+}
+
 //Called only at the first use of file system
-int diskInitialize(const char *fileName, int number)
+int diskInitialize(int number)
 {
     if( (number<=0) || (number>40960) )//maximal size of disk is 20MiB
     {
@@ -35,22 +53,12 @@ int diskInitialize(const char *fileName, int number)
         printf("ERROR: Allocation failure!\n");
         return 0;
     }
-    stream = fopen(fileName,"rb+");
-    if (!stream)
-        stream = fopen(fileName,"w+");
-    if(!stream)
-        return 0;
     numberOfBlocks = number;
     //ftruncate() - Function that shortens file to desired length
     //fileno() -  It shall return the integer file descriptor associated with the stream pointed to by stream
     ftruncate(fileno(stream), numberOfBlocks*DISK_BLOCK_SIZE);
 
     //******************RAID1 IMPLEMENTATION*************************
-    streamBackup = fopen("BackupDisk.bin","rb+");
-    if (!streamBackup)
-        streamBackup = fopen("BackupDisk.bin","wb+");
-    if(!streamBackup)
-        return 0;
     ftruncate(fileno(streamBackup), numberOfBlocks*DISK_BLOCK_SIZE);
     //***************************************************************
     return 1;
@@ -112,7 +120,7 @@ void diskRead(register int blockNumber,register char *data)
         printf("ERROR: Could not access emulated disk!\n Aborting...\n");
         abort();
     }
-    decrypt(data);
+    //decrypt(data);
     rewind(stream);
 }
 
@@ -134,7 +142,7 @@ void diskWrite(register int blockNumber,register const char *data)
     char *temp = calloc(DISK_BLOCK_SIZE,sizeof(char));
     for(int i =0;i<length;++i)
         temp[i] = data[i];
-    encrypt(temp);
+    //encrypt(temp);
 
     if(fwrite(temp, DISK_BLOCK_SIZE, 1, stream)==1)
         numberOfWrites++;
@@ -152,7 +160,55 @@ void diskWrite(register int blockNumber,register const char *data)
     temp = NULL;
 }
 
+/*
+NOTE: This is a function with changable number of arguments. It is used for writing superblock to disk as
+well as writing inodes to disk. Parameter mode can have values 's' for writing a superblock and 'i' for
+writing inode to disk.
+*/
+void diskWriteStructure(int blockNumber, int numberOfArguments, char mode, ...)
+{
+    va_list functionArguments;
+    va_start(functionArguments, numberOfArguments);
+
+    if(mode == 's')
+    {
+        SUPERBLOCK superBlock = va_arg(functionArguments, SUPERBLOCK);
+        rewind(stream);
+        fwrite(&superBlock, sizeof(SUPERBLOCK), 1, stream);
+        //********RAID1******************************************
+        rewind(streamBackup);
+        fwrite(&superBlock, sizeof(SUPERBLOCK), 1, streamBackup);
+        //*******************************************************
+    }
+    else if(mode == 'i')
+    {
+        INODE inode =  va_arg(functionArguments, INODE);
+        rewind(stream);
+        fseek(stream, blockNumber*DISK_BLOCK_SIZE, SEEK_SET);
+        fwrite(&inode, sizeof(INODE), 1, stream);
+        //********RAID1********************************************
+        rewind(streamBackup);
+        fseek(streamBackup, blockNumber*DISK_BLOCK_SIZE, SEEK_SET);
+        fwrite(&inode, sizeof(INODE), 1, streamBackup);
+        //*********************************************************
+    }
+    else
+    {
+        printf("ERROR: function-->diskWriteStructure(...) : Wrong mode parameter!\n");
+    }
+    va_end(functionArguments);
+    return;
+}
+
 //Formating and closing disk functions
+void formatBlock(int blockNumber)
+{
+    char *temp = calloc(DISK_BLOCK_SIZE, sizeof(char));
+    diskWrite(blockNumber, temp);
+    free(temp);
+    temp = NULL;
+}
+
 void diskFormat()
 {
     char *buffer = calloc(numberOfBlocks*DISK_BLOCK_SIZE, sizeof(char));
