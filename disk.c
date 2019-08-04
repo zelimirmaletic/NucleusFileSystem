@@ -27,7 +27,6 @@ practice there can be multiple backup hard drvies.
 is responsible for RAID1 implementation.
 **********************************************************************************
 */
-
 int diskOpen(const char *fileName)
 {
     stream = fopen(fileName,"rb+");
@@ -107,7 +106,6 @@ static void validityCheck(register int blockNumber, const char *data)
 }
 
 //Basic I/O functions
-
 void diskRead(register int blockNumber,register char *data)
 {
     validityCheck(blockNumber, data);
@@ -161,7 +159,7 @@ void diskWrite(register int blockNumber,register const char *data)
 }
 
 /*
-NOTE: This is a function with changable number of arguments. It is used for writing superblock to disk as
+NOTE: This is a function with variable number of arguments. It is used for writing superblock to disk as
 well as writing inodes to disk. Parameter mode can have values 's' for writing a superblock and 'i' for
 writing inode to disk.
 */
@@ -199,7 +197,41 @@ void diskWriteStructure(int blockNumber, int numberOfArguments, char mode, ...)
     va_end(functionArguments);
     return;
 }
+void diskReadStructure(int blockNumber, int numberOfArguments, char mode, ...)
+{
+    va_list functionArguments;
+    va_start(functionArguments, numberOfArguments);
 
+    if(mode == 's')
+    {
+        SUPERBLOCK *superBlock = va_arg(functionArguments, SUPERBLOCK *);
+        if(!superBlock)
+        {
+            printf("ERROR:diskReadStructure() ----> Invalid pointer!\n");
+            return;
+        }
+        rewind(stream);
+        fread(superBlock, sizeof(SUPERBLOCK), 1, stream);
+    }
+    else if(mode == 'i')
+    {
+        INODE *inode =  va_arg(functionArguments, INODE*);
+        if(!inode)
+        {
+            printf("ERROR:diskReadStructure() ----> Invalid pointer!\n");
+            return;
+        }
+        rewind(stream);
+        fseek(stream, blockNumber*DISK_BLOCK_SIZE, SEEK_SET);
+        fread(inode, sizeof(INODE), 1, stream);
+    }
+    else
+    {
+        printf("ERROR: function-->diskReadStructure(...) : Wrong mode parameter!\n");
+    }
+    va_end(functionArguments);
+    return;
+}
 //Formating and closing disk functions
 void formatBlock(int blockNumber)
 {
@@ -208,7 +240,6 @@ void formatBlock(int blockNumber)
     free(temp);
     temp = NULL;
 }
-
 void diskFormat()
 {
     char *buffer = calloc(numberOfBlocks*DISK_BLOCK_SIZE, sizeof(char));
@@ -291,4 +322,3 @@ static void decrypt(register char *data)
     }
 }
 //*******************************************************************************************************
-

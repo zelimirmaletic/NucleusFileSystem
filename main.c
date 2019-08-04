@@ -9,15 +9,17 @@ int main()
     //diskOpen("disk.bin");
     //diskInitialize(1);
 
-    //char letters[]="0xf0f03410Alice was...";
+    //char letters[]="Alice was...";
     //diskWrite(0,letters);
     //diskWrite(1,letters);
     //diskWrite(3,letters);
     //diskWrite(4,letters);
 
+    //fsFormat();
 
-    fsFormat();
-
+    fsMount();
+    for(int i=0;i<2*DISK_BLOCK_SIZE;i++)
+        //printf("%d", freeBlocksBitmap[i]);
     /*
     char *data = calloc(DISK_BLOCK_SIZE, sizeof(char));
     diskRead(0, data);
@@ -30,6 +32,7 @@ int main()
     //diskFormat();
     //formatBlock(0);
     */
+    closeFileSystem();
     diskClose();
     //free(data);
     //data = NULL;
