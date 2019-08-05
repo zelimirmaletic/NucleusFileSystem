@@ -3,6 +3,8 @@
 #include <string.h>
 #include "disk.h"
 #include "fileSystem.h"
+#include <time.h>
+
 
 int main()
 {
@@ -17,8 +19,8 @@ int main()
 
     //fsFormat();
 
-    fsMount();
-    for(int i=0;i<2*DISK_BLOCK_SIZE;i++)
+    //fsMount();
+    //for(int i=0;i<2*DISK_BLOCK_SIZE;i++)
         //printf("%d", freeBlocksBitmap[i]);
     /*
     char *data = calloc(DISK_BLOCK_SIZE, sizeof(char));
@@ -32,8 +34,8 @@ int main()
     //diskFormat();
     //formatBlock(0);
     */
-    closeFileSystem();
-    diskClose();
+    //closeFileSystem();
+    //diskClose();
     //free(data);
     //data = NULL;
 
@@ -44,5 +46,12 @@ int main()
     itoa(a, buffer, 10);
     printf("%s", buffer);
 */
+
+
+    time_t t = time(NULL);
+    struct tm *tm = localtime(&t);
+    char *myTime = asctime(tm);
+    //strcpy(myTime, asctime(tm));
+    printf("%s", myTime);
     return 0;
 }
