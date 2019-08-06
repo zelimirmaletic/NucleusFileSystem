@@ -7,23 +7,21 @@ typedef struct superblock
 {
     // Magic number is a way to tell that the superblock is present,
     // and that the file system is mounted on given disk
-    char magicNumber[8];
+    char magicNumber[9];
     char operatingSystem[10];
     unsigned short blockSize;
     unsigned short numberOfBlocks;
     unsigned short numberOfFreeBlocks;
+    //inode segment
     unsigned short numberOfInodeBlocks;
-    unsigned short inodeSize;
     unsigned short numberOfFreeInodes;
+    unsigned short inodeSegmentPointer;
+    unsigned short inodeTablePointer;
     unsigned short pointersPerInode;
+    //data segment
     unsigned short bitmapLength;
     unsigned short dataSegmentPointer;
-    unsigned short inodeSegmentPointer;
-    unsigned short inodeBitmapPointer;
-    unsigned short inodeTablePointer;
-    unsigned short dataBitmapPointer;
-    char creationTime[15];
-    char mountTime[15];
+    unsigned short freeBlocksBitmapPointer;
 }SUPERBLOCK;
 
 typedef struct inode
@@ -42,9 +40,13 @@ typedef struct inode
     char modificationTime[15];
     char creationTime[15];
     char owner[20];
-
-
 }INODE;
+
+typedef struct inodeTableRecord
+{
+    char fileName[20];
+    unsigned short inodeNumber;
+}
 
 //FUNCTIONS
 /*NOTES fsFormat(): Creates new file system on disk, writes superblock and clears all previous data.

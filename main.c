@@ -16,9 +16,8 @@ int main()
     //diskWrite(1,letters);
     //diskWrite(3,letters);
     //diskWrite(4,letters);
-
-    //fsFormat();
-
+    fsFormat();
+    fsMount();
     //fsMount();
     //for(int i=0;i<2*DISK_BLOCK_SIZE;i++)
         //printf("%d", freeBlocksBitmap[i]);
@@ -34,8 +33,8 @@ int main()
     //diskFormat();
     //formatBlock(0);
     */
-    //closeFileSystem();
-    //diskClose();
+    closeFileSystem();
+    diskClose();
     //free(data);
     //data = NULL;
 
@@ -52,6 +51,6 @@ int main()
     struct tm *tm = localtime(&t);
     char *myTime = asctime(tm);
     //strcpy(myTime, asctime(tm));
-    printf("%s", myTime);
+    //printf("%s", myTime);
     return 0;
 }

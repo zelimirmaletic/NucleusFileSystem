@@ -177,6 +177,7 @@ void diskWriteStructure(int blockNumber, int numberOfArguments, char mode, ...)
         rewind(streamBackup);
         fwrite(&superBlock, sizeof(SUPERBLOCK), 1, streamBackup);
         //*******************************************************
+        numberOfWrites++;
     }
     else if(mode == 'i')
     {
@@ -189,6 +190,7 @@ void diskWriteStructure(int blockNumber, int numberOfArguments, char mode, ...)
         fseek(streamBackup, blockNumber*DISK_BLOCK_SIZE, SEEK_SET);
         fwrite(&inode, sizeof(INODE), 1, streamBackup);
         //*********************************************************
+        numberOfWrites++;
     }
     else
     {
@@ -212,6 +214,7 @@ void diskReadStructure(int blockNumber, int numberOfArguments, char mode, ...)
         }
         rewind(stream);
         fread(superBlock, sizeof(SUPERBLOCK), 1, stream);
+        numberOfReads++;
     }
     else if(mode == 'i')
     {
@@ -224,6 +227,7 @@ void diskReadStructure(int blockNumber, int numberOfArguments, char mode, ...)
         rewind(stream);
         fseek(stream, blockNumber*DISK_BLOCK_SIZE, SEEK_SET);
         fread(inode, sizeof(INODE), 1, stream);
+        numberOfReads++;
     }
     else
     {
