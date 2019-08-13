@@ -16,7 +16,6 @@ typedef struct superblock
     unsigned short numberOfInodeBlocks;
     unsigned short numberOfFreeInodes;
     unsigned short inodeSegmentPointer;
-    unsigned short inodeTablePointer;
     unsigned short pointersPerInode;
     //data segment
     unsigned short bitmapLength;
@@ -26,7 +25,7 @@ typedef struct superblock
 
 typedef struct inode
 {
-    char magicNumber[8];
+    char fileName[20]; //file or folder name
     unsigned short inodePosition;
     unsigned short inodeSize;
     unsigned short directInodePointers[5];
@@ -34,7 +33,7 @@ typedef struct inode
     unsigned short isExtent;
     unsigned short extentLength;
     char fileType; //can be f- for file and d-for directory
-    char accessPermisions[5]; //in format r-w-x
+    char accessPermisions[6]; //in format r-w-x
     unsigned int fileSize;
     char accessTime[15];
     char modificationTime[15];
@@ -42,22 +41,22 @@ typedef struct inode
     char owner[20];
 }INODE;
 
-typedef struct inodeTableRecord
-{
-    char fileName[20];
-    unsigned short inodeNumber;
-}
-
 //FUNCTIONS
 /*NOTES fsFormat(): Creates new file system on disk, writes superblock and clears all previous data.
 If disk is already mounted, should do nothing.*/
 int fsFormat();
 void printSuperblock(SUPERBLOCK *superblock);
+void printInode(unsigned short inodeNumber);
 /*NOTES fsMount(): Examines the disk for a file system. If file system is present, reads superblock and creates
 free block bitmap-array*/
 int fsMount();
-
-
-
+void printFreeNodeBitmap(void);
+void writeFreeNodeBitmapToDisk(void);
+void readFreeNodeBitmapFromDisk(void);
+void clearInode(unsigned short inodeNumber);
+void clearCurrentInode(void);  //NOT IMPLEMENTED!
+unsigned short getInodeSize(unsigned short inodeNumber);
+int createInode(void); //NOT IMPLEMENTED!
+int updateFreeBlockBitmap(char mode, ...);
 void closeFileSystem();//Here we should release freeBlockBitmap and other dinamically allocated variables
 #endif // FILESYSTEM_H_INCLUDED

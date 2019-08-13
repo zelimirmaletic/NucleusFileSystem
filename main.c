@@ -4,6 +4,7 @@
 #include "disk.h"
 #include "fileSystem.h"
 #include <time.h>
+#include "supportLibrary.c"
 
 
 int main()
@@ -16,7 +17,8 @@ int main()
     //diskWrite(1,letters);
     //diskWrite(3,letters);
     //diskWrite(4,letters);
-    fsFormat();
+    //fsFormat();
+    //fsFormat();
     fsMount();
     //fsMount();
     //for(int i=0;i<2*DISK_BLOCK_SIZE;i++)
@@ -46,11 +48,5 @@ int main()
     printf("%s", buffer);
 */
 
-
-    time_t t = time(NULL);
-    struct tm *tm = localtime(&t);
-    char *myTime = asctime(tm);
-    //strcpy(myTime, asctime(tm));
-    //printf("%s", myTime);
     return 0;
 }

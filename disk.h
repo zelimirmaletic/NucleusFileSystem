@@ -4,6 +4,7 @@
 
 int diskOpen(const char *fileName);
 int  diskInitialize(int numberOfBlocks );
+void setNumberOfBlocks(unsigned short number);
 float diskUsage();
 //Functions for determining disk size
 int  diskSize();

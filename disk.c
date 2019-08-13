@@ -16,6 +16,10 @@ static unsigned int numberOfBlocks = 0;
 static unsigned int numberOfReads = 0;
 static unsigned int numberOfWrites = 0;
 
+void setNumberOfBlocks(unsigned short number)
+{
+    numberOfBlocks = number;
+}
 /*
 *******************NOTE ABOUT EMULATED DISK-FAILURE SECURITY***********************
 -This emulation of a physical hard drive has a built-in disk-failure security.
