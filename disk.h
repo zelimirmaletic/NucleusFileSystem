@@ -1,6 +1,7 @@
 #ifndef DISK_H_INCLUDED
 #define DISK_H_INCLUDED
 #define DISK_BLOCK_SIZE 512
+#define DISK_SIZE 1 //in [MiB] Note: the limit is 20MiB
 
 int diskOpen(const char *fileName);
 int  diskInitialize(int numberOfBlocks );

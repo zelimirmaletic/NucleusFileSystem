@@ -21,6 +21,8 @@ typedef struct superblock
     unsigned short bitmapLength;
     unsigned short dataSegmentPointer;
     unsigned short freeBlocksBitmapPointer;
+    //files information
+    unsigned short numberOfFiles; // files and folders together
 }SUPERBLOCK;
 
 typedef struct inode
@@ -40,13 +42,13 @@ typedef struct inode
     char creationTime[15];
     char owner[20];
 }INODE;
-
 //FUNCTIONS
 /*NOTES fsFormat(): Creates new file system on disk, writes superblock and clears all previous data.
 If disk is already mounted, should do nothing.*/
 int fsFormat();
 void printSuperblock(SUPERBLOCK *superblock);
 void printInode(unsigned short inodeNumber);
+void printDataBlock(unsigned short blockNumber);
 /*NOTES fsMount(): Examines the disk for a file system. If file system is present, reads superblock and creates
 free block bitmap-array*/
 int fsMount();
@@ -54,9 +56,12 @@ void printFreeNodeBitmap(void);
 void writeFreeNodeBitmapToDisk(void);
 void readFreeNodeBitmapFromDisk(void);
 void clearInode(unsigned short inodeNumber);
-void clearCurrentInode(void);  //NOT IMPLEMENTED!
+void clearCurrentInode(void);
+int fsDeleteInode(unsigned short inodeNumber);
+void fsRead(unsigned short inodeNumber);
 unsigned short getInodeSize(unsigned short inodeNumber);
-int createInode(void); //NOT IMPLEMENTED!
+unsigned short createInode(void);
 int updateFreeBlockBitmap(char mode, ...);
 void closeFileSystem();//Here we should release freeBlockBitmap and other dinamically allocated variables
+unsigned short findInodeByFIleName(const char *fileName);//NOT IMPLEMENTED!
 #endif // FILESYSTEM_H_INCLUDED
