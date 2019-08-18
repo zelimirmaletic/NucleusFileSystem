@@ -9,15 +9,28 @@
 
 int main()
 {
+
+    char Data[] = "This is an article about Coco Chanel. You may definitely recognize a double CC logo...\0";
+
     fsFormat();
     fsMount();
+
+    //createInode("CocoChanel.txt");
+    /*
+    createInode("Versace.jpg");
+    createInode("Valentino.txt");
+    createInode("Gucci.txt");
+    */
+    //fsDeleteInode(1);
+    //fsDeleteInode(3);
+    //fsDeleteInode(3);
+
+    //fsWrite(1,Data);
+    fsRead(1);
+
+
+    fsDebug();
     closeFileSystem();
-
-    printf("BLOCK 1 CONTENCE--->\n");
-    printDataBlock(10);
-
     diskClose();
-
-
     return 0;
 }

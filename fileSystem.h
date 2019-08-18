@@ -1,7 +1,6 @@
 #ifndef FILESYSTEM_H_INCLUDED
 #define FILESYSTEM_H_INCLUDED
 #include "disk.h"
-
 //DATA STRUCTURES
 typedef struct superblock
 {
@@ -21,13 +20,17 @@ typedef struct superblock
     unsigned short bitmapLength;
     unsigned short dataSegmentPointer;
     unsigned short freeBlocksBitmapPointer;
-    //files information
-    unsigned short numberOfFiles; // files and folders together
+    //time information
+    char formatTime[30];
+    char mountTime[30];
+    //logindata ---> to be implemented later!
+    //char username[30];
+    //char password[30];
 }SUPERBLOCK;
 
 typedef struct inode
 {
-    char fileName[20]; //file or folder name
+    char fileName[30]; //file or folder name
     unsigned short inodePosition;
     unsigned short inodeSize;
     unsigned short directInodePointers[5];
@@ -37,31 +40,38 @@ typedef struct inode
     char fileType; //can be f- for file and d-for directory
     char accessPermisions[6]; //in format r-w-x
     unsigned int fileSize;
-    char accessTime[15];
-    char modificationTime[15];
-    char creationTime[15];
-    char owner[20];
+    char creationTime[30];
+    char accessTime[30];
+    char modificationTime[30];
+    char absoluteAdress[20];
 }INODE;
 //FUNCTIONS
 /*NOTES fsFormat(): Creates new file system on disk, writes superblock and clears all previous data.
 If disk is already mounted, should do nothing.*/
 int fsFormat();
-void printSuperblock(SUPERBLOCK *superblock);
-void printInode(unsigned short inodeNumber);
-void printDataBlock(unsigned short blockNumber);
 /*NOTES fsMount(): Examines the disk for a file system. If file system is present, reads superblock and creates
 free block bitmap-array*/
 int fsMount();
+//Output functions
+void printSuperblock(SUPERBLOCK *superblock);
+void printInode(unsigned short inodeNumber);
+void printDataBlock(unsigned short blockNumber);
 void printFreeNodeBitmap(void);
+void fsDebug(void);
+//Functions for INODE manipulation
 void writeFreeNodeBitmapToDisk(void);
 void readFreeNodeBitmapFromDisk(void);
 void clearInode(unsigned short inodeNumber);
 void clearCurrentInode(void);
-int fsDeleteInode(unsigned short inodeNumber);
+unsigned short fsDeleteInode(unsigned short inodeNumber);
+void fsWrite(unsigned short inodeNumber, const char *data);
 void fsRead(unsigned short inodeNumber);
 unsigned short getInodeSize(unsigned short inodeNumber);
-unsigned short createInode(void);
-int updateFreeBlockBitmap(char mode, ...);
+unsigned short createInode(const char *name);
+int updateFreeBlockBitmap(char mode, ...); //This function is for inodes
+unsigned short getFreeDataBlock(void);
+unsigned short findInodeByFIleName(const char *fileName);
+//TIME FUNCTION
+void getCurrentTime(char *outputPointer);
 void closeFileSystem();//Here we should release freeBlockBitmap and other dinamically allocated variables
-unsigned short findInodeByFIleName(const char *fileName);//NOT IMPLEMENTED!
 #endif // FILESYSTEM_H_INCLUDED

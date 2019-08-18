@@ -37,7 +37,7 @@ int diskOpen(const char *fileName)
     if (!stream)
         stream = fopen(fileName,"w+");
     if(!stream)
-        return 0;
+        return -1;
     //************RAID1 IMPLEMENTATION****************
     streamBackup = fopen("BackupDisk.bin","rb+");
     if (!streamBackup)
@@ -122,7 +122,7 @@ void diskRead(register int blockNumber,register char *data)
         printf("ERROR: Could not access emulated disk!\n Aborting...\n");
         abort();
     }
-    //decrypt(data);
+    decrypt(data);
     rewind(stream);
 }
 
@@ -144,7 +144,7 @@ void diskWrite(register int blockNumber,register const char *data)
     char *temp = calloc(DISK_BLOCK_SIZE,sizeof(char));
     for(int i =0;i<length;++i)
         temp[i] = data[i];
-    //encrypt(temp);
+    encrypt(temp);
 
     if(fwrite(temp, DISK_BLOCK_SIZE, 1, stream)==1)
         numberOfWrites++;
