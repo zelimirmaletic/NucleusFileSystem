@@ -31,7 +31,7 @@ void switchToBackupDisk();//ROOT RIGHTS
 //Full-disk-encryption implementation
 //Here is implemented so called OTFE (On-The-Fly-Encryption)
 //These functions are not visible from outside of disk.h and disk.c
-static void encrypt(char *data);
-static void decrypt(char *data);
+static void encrypt(register char *data);
+static void decrypt(register char *data);
 
 #endif // DISK_H_INCLUDED

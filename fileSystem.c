@@ -8,12 +8,12 @@
 #include <math.h>
 
 #include "fileSystem.h"
-#define POINTERS_PER_INODE 5
 
 //GLOBAL VARIABLES
 static SUPERBLOCK superblock;
 static char *freeBlocksBitmap;
 static INODE currentInode;
+unsigned short isMounted;
 //Functions for managing superBlock
 void printSuperblock(SUPERBLOCK *superblock)
 {
@@ -41,28 +41,21 @@ void printSuperblock(SUPERBLOCK *superblock)
     printf("------------------------------------\n");
 }
 
-int fsFormat()
+int fsFormat(char sudoRight)
 {
     diskOpen("disk.bin");
-    char *temp = calloc(DISK_BLOCK_SIZE, sizeof(char));
-    diskRead(0,temp);
-    int isMounted = 1;
+    diskReadStructure(0,1,'s',&superblock);
+    int isMounted = 0;
     //Now we have to check whether the disk is mounted or not
     //We do that by checking the existance of magic number in the superblock
     char magicNumber[] = "0xf0f034";
-    for(int i=0;i<8;i++)
-    {
-        if(*(temp+i) != *(magicNumber+i))
-        {
-            isMounted = 0;
-            break;
-        }
-    }
+    if(strcmp(superblock.magicNumber, magicNumber)==0)
+        isMounted = 1;
+    if(sudoRight == 's')
+        isMounted = 0;
     if(isMounted==1)
     {
-        printf("WARNING: Disk is already mounted! You cannot format it.\n");
-        free(temp);
-        temp = NULL;
+        printf("WARNING: Disk is already formatted! You cannot format it again.\n");
         return 1;
     }
     else //create new File System
@@ -97,25 +90,23 @@ int fsFormat()
                 printf("FREEBLOCK BITMAP ALLOCATION FAILURE!\n");
         for(int i=0;i<superblock.bitmapLength*DISK_BLOCK_SIZE;++i)
             *(freeBlocksBitmap + i) = '0';
-        *freeBlocksBitmap = '1';
         writeFreeNodeBitmapToDisk();
         free(freeBlocksBitmap);
         freeBlocksBitmap = NULL;
     }
-    free(temp);
-    temp = NULL;
     return 0;
 }
 
 int fsMount()
 {
+    isMounted=1;
     diskOpen("disk.bin");
     diskReadStructure(0,1,'s',&superblock);
     getCurrentTime(&superblock.mountTime);
     setNumberOfBlocks(superblock.numberOfBlocks);
     if(!strcmp(superblock.magicNumber, "0xf0f034"))
     {
-       // printSuperblock(&superblock); //--------------------------> COMMENT OUT THIS LATER!
+        //printSuperblock(&superblock); //--------------------------> COMMENT OUT THIS LATER!
         //Disk is formated and has FS, create bitmap
         //Here we should read the bitmap from disk!
         freeBlocksBitmap = calloc(superblock.bitmapLength*DISK_BLOCK_SIZE, sizeof(char));
@@ -140,36 +131,48 @@ void printInode(unsigned short inodeNumber)
     else
         printf("\tDirectory name: %s\n", inode.fileName);
     printf("\tPosition: %d\n", inode.inodePosition);
-    printf("\tSize: %d\n",inode.inodeSize );
-    printf("\tDirect pointers: ");
-    for(int i=0;i<POINTERS_PER_INODE;i++)
+    if(inode.fileType == 'f')
     {
-        if( (inode.directInodePointers)[i] == 0 )
-            printf("x ");
-        else
-            printf("%d ",(inode.directInodePointers)[i]);
+        printf("\tSize: %d [B]\n",inode.fileSize );
+        printf("\tDirect pointers: ");
+        for(int i=0;i<POINTERS_PER_INODE;i++)
+        {
+            if( (inode.directInodePointers)[i] == 0 )
+                printf("x ");
+            else
+                printf("%d ",(inode.directInodePointers)[i]);
+        }
+        printf("\n");
+        printf("\tIs extent: ");
+        inode.isExtent==1?printf("true\n"):printf("false\n");
+        if(inode.isExtent==1)
+            printf("\tExtent length: %d\n",inode.extentLength);
     }
-    printf("\n");
-    printf("\tIs extent: ");
-    inode.isExtent=='1'?printf("true\n"):printf("false\n");
-    if(inode.isExtent=='1')
-        printf("\tExtent length: %d\n",inode.extentLength);
+    else
+    {
+        //Here should be implemented a size for directory------------------->MODIFY
+    }
     printf("\tAccess permisions: %s\n",inode.accessPermisions);
     //Make directorySize() function
     //Print here file or directory size
-    printf("\tType: %s\n",inode.fileType=='f'?"file":(inode.fileType=='d'?"directory":"not specified")); //double ternary operator OMG!
+    printf("\tType: %s\n",inode.fileType=='f'?"file":(inode.fileType=='d'?"directory":"not specified")); //nested ternary operator OMG!
+    printf("\tCreation time: %s",inode.creationTime);
     printf("\tAccess time: %s",inode.accessTime);
     printf("\tModification time: %s",inode.modificationTime);
-    printf("\tCreation time: %s",inode.modificationTime);
     printf("\tAbsolute adress: %s\n", inode.absoluteAdress);
 }
 
 void fsDebug(void)
 {
-    printSuperblock(&superblock);
-    for(int i=1;i<superblock.numberOfInodeBlocks;++i)
+    if(isMounted!=1)
     {
-        if(freeBlocksBitmap[i]!='0')
+        printf("ERROR: You have to mount file system first!\n");
+        return;
+    }
+    printSuperblock(&superblock);
+    for(int i=0;i<superblock.numberOfInodeBlocks;++i)
+    {
+        if(freeBlocksBitmap[i]=='1')
         {
             printf("\t");
             printInode(i);
@@ -181,16 +184,60 @@ void printDataBlock(unsigned short blockNumber)
 {
     char *temp = calloc(DISK_BLOCK_SIZE, sizeof(char));
     diskRead(blockNumber, temp);
-    printf("%s", temp);
+    for(int i=0;i<strlen(temp);++i)
+        printf("%c", temp[i]);
     free(temp);
     temp = NULL;
 }
 
+void printAllFilesAndFolders(char *currentAbsoluteAdress)
+{
+    if(isMounted!=1)
+    {
+        printf("ERROR: You have to mount file system first!\n");
+        return;
+    }
+    short flagIsEmpty = 1;
+    printf("-----------------------------\n");
+    for(unsigned short i=0;i<superblock.numberOfInodeBlocks;++i)
+    {
+        if(freeBlocksBitmap[i]=='1')
+        {
+            diskReadStructure(superblock.inodeSegmentPointer + i, 1, 'i', &currentInode);
+            if(!strcmp(currentInode.absoluteAdress, currentAbsoluteAdress))
+            {
+                flagIsEmpty = 0;
+                if(currentInode.fileType=='d')
+                    printf("%s[dir]\n", currentInode.fileName);
+                else
+                    printf("%s\n", currentInode.fileName);
+            }
+        }
+    }
+    if(flagIsEmpty)
+        printf("NOTIFICATION: No files or folders to be shown\n");
+    printf("-----------------------------\n");
+}
+
 void printFreeNodeBitmap(void)
 {
+    if(isMounted!=1)
+    {
+        printf("ERROR: You have to mount file system first!\n");
+        return;
+    }
     printf("=============================FREE BLOCKS BITMAP=================================\n");
     for(int i=0;i<(superblock.bitmapLength)*DISK_BLOCK_SIZE;++i)
-            printf("%c",*(freeBlocksBitmap+i));
+    {
+        if(i==0)
+            printf("INODES:\n");
+        if(i==superblock.dataSegmentPointer)
+            printf("\nDATA BLOCKS:\n");
+        if(*(freeBlocksBitmap+i)=='1')
+           printf("[%d] ",i);
+        else
+            printf("%c ",*(freeBlocksBitmap+i));
+    }
     printf("\n================================================================================\n");
 }
 
@@ -233,12 +280,13 @@ void readFreeNodeBitmapFromDisk(void)
     }
 }
 
-void clearInode(unsigned short inodeNumber)
-{
-    formatBlock(superblock.inodeSegmentPointer + inodeNumber);
-}
 void clearCurrentInode(void)
 {
+    if(isMounted!=1)
+    {
+        printf("ERROR: You have to mount file system first!\n");
+        return;
+    }
     strcpy(currentInode.fileName, " ");
     currentInode.inodePosition = 0;
     currentInode.inodeSize = 0;
@@ -249,31 +297,41 @@ void clearCurrentInode(void)
     currentInode.fileType = ' ';
     strcpy(currentInode.accessPermisions, "-----");
     currentInode.fileSize = 0;
-    strcpy(currentInode.accessTime, "none");
-    strcpy(currentInode.modificationTime, "none");
-    strcpy(currentInode.creationTime, "none");
-    strcpy(currentInode.absoluteAdress, "root/");
+    strcpy(currentInode.accessTime, "\0");
+    strcpy(currentInode.modificationTime, "\0");
+    strcpy(currentInode.creationTime, "\0");
+    strcpy(currentInode.absoluteAdress, "root/\0");
 }
 unsigned short getInodeSize(unsigned short inodeNumber)
 {
+    if(isMounted!=1)
+    {
+        printf("ERROR: You have to mount file system first!\n");
+        return;
+    }
+    clearCurrentInode();
     diskReadStructure(inodeNumber,1,'i',&currentInode);
     return currentInode.inodeSize;
 }
-unsigned short createInode(const char *name)
+short createInode(const char *name, char type, char *currentAbsoluteAdress)
 {
+    if(isMounted!=1)
+    {
+        printf("ERROR: You have to mount file system first!\n");
+        return;
+    }
     clearCurrentInode();
     currentInode.inodePosition = updateFreeBlockBitmap('w');
     if(currentInode.inodePosition == -1)//if there is an error in inode allocation(in bitmap)
         return -1;
-    //Here we should write time and date to inode structure
     strcpy(currentInode.fileName, name);
-    char buffer[30];
-    getCurrentTime(buffer);
-    strcpy(currentInode.modificationTime, buffer);
-    strcpy(currentInode.creationTime, buffer);
-    strcpy(currentInode.accessTime, buffer);
+    //Here we should write time and date to inode structure
+    getCurrentTime(currentInode.creationTime);
+    strcpy(currentInode.accessTime, "Not accessed yet\n");
+    strcpy(currentInode.modificationTime, "Not modified yet\n");
     strcpy(currentInode.accessPermisions, "r-w-x");
-    strcpy(currentInode.absoluteAdress, "root/");
+    strcpy(currentInode.absoluteAdress, currentAbsoluteAdress);
+    currentInode.fileType = type;
     diskWriteStructure(superblock.inodeSegmentPointer + currentInode.inodePosition, 1, 'i', currentInode);
     superblock.numberOfFreeInodes--;
     superblock.numberOfFreeBlocks--;
@@ -281,10 +339,21 @@ unsigned short createInode(const char *name)
 }
 unsigned short fsDeleteInode(unsigned short inodeNumber)
 {
+    if(isMounted!=1)
+    {
+        printf("ERROR: You have to mount file system first!\n");
+        return;
+    }
+    if(freeBlocksBitmap[inodeNumber]=='0')
+    {
+        printf("ERROR: There is nothing to be deleted!\n");
+        return;
+    }
+    clearCurrentInode();
     diskReadStructure(superblock.inodeSegmentPointer + inodeNumber, 1, 'i', &currentInode);
     if(currentInode.isExtent == 0) //If not an extent regularly free all data
     {
-         //First, clear data blocks on disk!
+        //First, clear data blocks on disk!
         for(int i=0;i<POINTERS_PER_INODE;++i)
         {
             if((currentInode.directInodePointers)[i] != 0)
@@ -294,7 +363,7 @@ unsigned short fsDeleteInode(unsigned short inodeNumber)
             }
         }
         //Then, clear inode in disk
-        clearInode(inodeNumber);
+        formatBlock(superblock.inodeSegmentPointer + inodeNumber);
         //Finally, release inode from free block bitmap
         updateFreeBlockBitmap('d', inodeNumber);
         superblock.numberOfFreeInodes++;
@@ -303,59 +372,145 @@ unsigned short fsDeleteInode(unsigned short inodeNumber)
     }
     else //This part is for releasing extent from file system
     {
-        for(int i = 0; i < currentInode.extentLength; ++i)
+        for(unsigned short i = 0; i < currentInode.extentLength; ++i)
         {
             formatBlock(currentInode.directInodePointers[0] + i);
-            updateFreeBlockBitmap('d', (currentInode.directInodePointers)[0]+i);
+            updateFreeBlockBitmap('d', ((currentInode.directInodePointers)[0])+i);
         }
         //Then, clear inode in disk
-        clearInode(inodeNumber);
+        formatBlock(superblock.inodeSegmentPointer + inodeNumber);
         //Finally, release inode from free block bitmap
         updateFreeBlockBitmap('d', inodeNumber);
         superblock.numberOfFreeInodes++;
+        superblock.numberOfFreeBlocks+= currentInode.extentLength;
         return 0;
     }
     return -1; //If error occurs return -1
 }
 
-void fsWrite(unsigned short inodeNumber, const char *data)//----------------->NOT FINISHED!
+short fsWrite(unsigned short inodeNumber, const char *data)//----------------->NOT FINISHED!
 {
+    if(isMounted!=1)
+    {
+        printf("ERROR: You have to mount file system first!\n");
+        return;
+    }
+    if(!data)
+        return -1; //there is an error in data pointer!
     //First we have to determine the size of data array
     unsigned int dataSize = strlen(data);
     char *temp = calloc(DISK_BLOCK_SIZE, sizeof(char));
     clearCurrentInode();
     diskReadStructure(superblock.inodeSegmentPointer+inodeNumber, 1, 'i', &currentInode);
 
-    if(dataSize < DISK_BLOCK_SIZE)
+    if(currentInode.directInodePointers[0]==0)
     {
-        for(int i=0;i<dataSize;++i)
-            *(temp + i) = *(data + i);
-        currentInode.directInodePointers[0] = getFreeDataBlock();
-        diskWrite(currentInode.directInodePointers[0], temp);
-        diskWriteStructure(superblock.inodeSegmentPointer + inodeNumber, 1, 'i', currentInode);
-        return;
+        //Here we have to write, there are no allocated data blicks!
+        if(dataSize<DISK_BLOCK_SIZE)//if we only write to one block
+        {
+            for(int i=0;i<dataSize;++i)
+                temp[i] = data[i];
+            currentInode.directInodePointers[0] = getFreeDataBlock();
+            diskWrite(currentInode.directInodePointers[0], temp);
+        }
+        else
+        {
+            short numberOfBlocksNeeded = (short)(ceil((float)dataSize/(float)DISK_BLOCK_SIZE));
+            if(dataSize< POINTERS_PER_INODE*DISK_BLOCK_SIZE) // if not extent, but has more than 512 B
+            {
+                for(int i=0;i<numberOfBlocksNeeded;++i)
+                {
+                    int j=i*DISK_BLOCK_SIZE;
+                    for(int k=0;j<(i+1)*DISK_BLOCK_SIZE; ++j,++k)
+                        temp[k] = data[j];
+                    currentInode.directInodePointers[i] = getFreeDataBlock();
+                    diskWrite(currentInode.directInodePointers[i],temp);
+                }
+            }
+            else // this is for extent
+            {
+                currentInode.isExtent = 1;
+                currentInode.extentLength = numberOfBlocksNeeded;
+                currentInode.directInodePointers[0] = getBlocksForExtent(currentInode.extentLength);
+                for(int i=0; i<numberOfBlocksNeeded;++i)
+                {
+                    int j=i*DISK_BLOCK_SIZE;
+                    for(int k=0;j<(i+1)*DISK_BLOCK_SIZE; ++j,++k)
+                        temp[k] = data[j];
+                    diskWrite(currentInode.directInodePointers[0]+i,temp);
+                    freeBlocksBitmap[currentInode.directInodePointers[0]+i] = '1';
+                }
+                superblock.numberOfFreeBlocks-=numberOfBlocksNeeded;
+            }
+        }
     }
+    else//we update or concatenate contence to existing data blocks
+    {
+        printf("NOTIFICATION:%s already has contence. Updating file contence is not supported yet.\n",currentInode.fileName);
+        fsUpdate(inodeNumber, data);
+
+    }
+    currentInode.fileSize = dataSize;
+    getCurrentTime(currentInode.modificationTime);
+    diskWriteStructure(superblock.inodeSegmentPointer+inodeNumber,1,'i',currentInode);
     free(temp);
     temp = NULL;
+    return 0;
 }
-
+short fsUpdate(unsigned short inodeNumber, const char *data)
+{
+    //Code code code
+    return 0;
+}
 void fsRead(unsigned short inodeNumber)
 {
+    if(isMounted!=1)
+    {
+        printf("ERROR: You have to mount file system first!\n");
+        return;
+    }
+    //Check inode validity
+    if(freeBlocksBitmap[inodeNumber] == '0' || inodeNumber<0 || inodeNumber > superblock.numberOfInodeBlocks)
+    {
+        printf("ERROR: Invalid inode number in fsRead() function!\n");
+        return;
+    }
+    clearCurrentInode();
     diskReadStructure(superblock.inodeSegmentPointer+inodeNumber, 1, 'i', &currentInode);
+    if(currentInode.fileType=='d')
+    {
+        printf("ERROR: You cannot use this command on a folder!\n");
+        return;
+    }
+    if(currentInode.directInodePointers[0]==0)
+    {
+        printf("WARNING: %s is empty, there is nothing to be printed!\n", currentInode.fileName);
+        getCurrentTime(currentInode.accessTime);
+        diskWriteStructure(superblock.inodeSegmentPointer + inodeNumber,1,'i',currentInode);
+        return;
+    }
+    printf("\n");
+    printf("****************************************\n");
+    printf("%s\n", currentInode.fileName);
+    printf("****************************************\n");
     if(currentInode.isExtent != 1)//if not an extent
     {
-        for(unsigned short i=0;(currentInode.directInodePointers)[i] == 'x' || i < 5;++i)
-        {
-            printDataBlock((currentInode.directInodePointers)[i]);
-        }
+        short counter = 0;
+        for(short i=0;i<POINTERS_PER_INODE;++i)
+            if(currentInode.directInodePointers[i]!= 0)
+                counter++;
+        for(unsigned short i=0;i < counter;++i)
+                printDataBlock((currentInode.directInodePointers)[i]);
     }
     else //if extent
     {
         for(unsigned short i=0; i < currentInode.extentLength; ++i)
-        {
             printDataBlock( *(currentInode.directInodePointers) + i);
-        }
     }
+    //Update access time
+    getCurrentTime(currentInode.accessTime);
+    diskWriteStructure(superblock.inodeSegmentPointer + inodeNumber,1,'i',currentInode);
+    printf("\n");
 }
 
 int updateFreeBlockBitmap(char mode, ...)//write part here is only for inodes!
@@ -365,30 +520,23 @@ int updateFreeBlockBitmap(char mode, ...)//write part here is only for inodes!
         va_list funcitonArguments;
         va_start(funcitonArguments,1);
         int blockNumber = va_arg(funcitonArguments, int);
-            if(blockNumber<1)
-                return -1; //we cannot delete superblock flag!
-        *(freeBlocksBitmap+blockNumber) = '0';
+        freeBlocksBitmap[blockNumber] = '0';
         va_end(funcitonArguments);
         return 0;
     }
     else if(mode == 'w') //write 1 to first free position - mark one inode
     {
-        unsigned short noMoreFreeFlag = 1;
-        for(int i=1; i<=(superblock.bitmapLength*DISK_BLOCK_SIZE); ++i)
+        for(int i=0; i<(superblock.bitmapLength*DISK_BLOCK_SIZE); ++i)
         {
             if(*(freeBlocksBitmap+i) == '0' )
             {
                 *(freeBlocksBitmap+i) = '1';
-                noMoreFreeFlag = 0;
                 return i;//return number of inode taken
             }
         }
         //Error handle, when there are no more free blocks
-        if(noMoreFreeFlag == 1)
-        {
-            printf("ERROR: No more free inode blocks!\n");
-            return -1;
-        }
+        printf("ERROR: No more free inode blocks!\n");
+        return -1;
     }
     return -1; //There is an error in char argument
 }
@@ -396,13 +544,13 @@ int updateFreeBlockBitmap(char mode, ...)//write part here is only for inodes!
 unsigned short getFreeDataBlock(void)
 {
     unsigned short noMoreFreeFlag = 1;
-    for(int i=superblock.dataSegmentPointer; i<=(superblock.numberOfBlocks-superblock.numberOfInodeBlocks-1);++i)
+    for(int i=0; i<(superblock.numberOfBlocks-superblock.numberOfInodeBlocks-1);++i)
     {
         if( *(freeBlocksBitmap + superblock.dataSegmentPointer + i) == '0')
         {
             *(freeBlocksBitmap + superblock.dataSegmentPointer + i) = '1';
             noMoreFreeFlag = 0;
-            return i;
+            return superblock.dataSegmentPointer+i;
         }
     }
     //Error handle, when there are no more free blocks
@@ -412,6 +560,29 @@ unsigned short getFreeDataBlock(void)
         return -1;
     }
     return -1; //There was an error
+}
+
+int getBlocksForExtent(unsigned short extentLength)
+{
+    printFreeNodeBitmap();
+    for(int i=0;i< superblock.bitmapLength*DISK_BLOCK_SIZE;++i)
+    {
+        if(freeBlocksBitmap[superblock.dataSegmentPointer + i] == '0')
+        {
+            short flag=1;
+            for(int j=i;j<i+extentLength;++j)
+            {
+                if(freeBlocksBitmap[superblock.dataSegmentPointer+i+j]=='1')
+                    flag = 0;
+            }
+            if(flag==1)
+            {
+                freeBlocksBitmap[superblock.dataSegmentPointer + i] = '1';
+                return (superblock.dataSegmentPointer + i);
+            }
+        }
+    }
+    return -1;// We dnon't have enough space to fit extent!
 }
 
 //TIME FUNCTION
@@ -431,7 +602,7 @@ void getCurrentTime(char *outputPointer)
 unsigned short findInodeByFIleName(const char *fileName)
 {
     char fileNotFound = '1';
-    for(int i=1;i<=superblock.numberOfInodeBlocks;++i)
+    for(int i=0;i<=superblock.numberOfInodeBlocks;++i)
     {
         if(freeBlocksBitmap[i]=='1')
         {
@@ -449,8 +620,64 @@ unsigned short findInodeByFIleName(const char *fileName)
         return 0; //file is not found
 }
 
+short folderExists(char *folderName, char *currentAbsoluteAdress)
+{
+    for(int i=0;i<=superblock.numberOfInodeBlocks;++i)
+    {
+        if(freeBlocksBitmap[i]=='1')
+        {
+            clearCurrentInode();
+            diskReadStructure(superblock.inodeSegmentPointer + i,1,'i', &currentInode);
+            if(!strcmp(currentInode.fileName, folderName) && currentInode.fileType=='d')
+                    return 1;
+        }
+    }
+    return 0; //folder is not found
+}
+
+short fileExists(char *fileName, char *currentAbsoluteAdress)
+{
+    for(int i=0;i<=superblock.numberOfInodeBlocks;++i)
+    {
+        if(freeBlocksBitmap[i]=='1')
+        {
+            clearCurrentInode();
+            diskReadStructure(superblock.inodeSegmentPointer + i,1,'i', &currentInode);
+            if(strcmp(currentInode.fileName, fileName) == 0 && currentInode.fileType=='f')
+            {
+                if(!strcmp(currentInode.absoluteAdress, currentAbsoluteAdress))
+                    return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+void renameInode(char *oldName,char *newName)
+{
+    if(isMounted!=1)
+    {
+        printf("ERROR: You have to mount file system first!\n");
+        return;
+    }
+    clearCurrentInode();
+    unsigned short inodeNumber = findInodeByFIleName(oldName);
+    if(!inodeNumber)
+    {
+        printf("ERROR: Could not find file. Check your spelling\n");
+        return;
+    }
+    diskReadStructure(superblock.inodeSegmentPointer + inodeNumber,1,'i', &currentInode);
+    strcpy(currentInode.fileName, newName);
+    diskWriteStructure(superblock.inodeSegmentPointer + inodeNumber,1,'i', currentInode);
+}
 void closeFileSystem()
 {
+    if(isMounted!=1)
+    {
+        printf("ERROR: You have to mount file system first!\n");
+        return;
+    }
     //Make sure to save all relevant structures and data to disk!
     writeFreeNodeBitmapToDisk();
     diskWriteStructure(0,1,'s',superblock);
