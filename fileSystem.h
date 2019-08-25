@@ -1,6 +1,7 @@
 #ifndef FILESYSTEM_H_INCLUDED
 #define FILESYSTEM_H_INCLUDED
 #include "disk.h"
+#include "shell.h"
 #define POINTERS_PER_INODE 5
 
 unsigned short treeDepth; //maximal is 2
@@ -60,8 +61,8 @@ int fsMount();
 void printSuperblock(SUPERBLOCK *superblock);
 void printInode(unsigned short inodeNumber);
 void printDataBlock(unsigned short blockNumber);
-void printFreeNodeBitmap(void);
-void printAllFilesAndFolders(char *currentAbsoluteAdress);
+void printFreeBlocksBitmap(void);
+void printAllFilesAndFolders(char *currentAbsoluteAdress, char mode);
 void fsDebug(void);
 //Functions for INODE manipulation
 void writeFreeNodeBitmapToDisk(void);
@@ -78,10 +79,15 @@ int updateFreeBlockBitmap(char mode, ...); //This function is for inodes
 unsigned short getFreeDataBlock(void);
 int getBlocksForExtent(unsigned short extentLength);
 unsigned short findInodeByFIleName(const char *fileName);
+unsigned short findInodeByFolderName(const char *folderName);
 void renameInode(char *oldName, char *newName);
-short folderExists(char *folderName, char *currentAbsoluteAdress);
+void updateAbsoluteAdress(char *fileName, char *destinationFolder);
+short folderExists(char *folderName);
 short fileExists(char *fileName, char *currentAbsoluteAdress);
+void removeFolder(char *folderName);
 //TIME FUNCTION
 void getCurrentTime(char *outputPointer);
 void closeFileSystem();//Here we should release freeBlockBitmap and other dinamically allocated variables
+//Statistic functions
+float diskUsage();
 #endif // FILESYSTEM_H_INCLUDED

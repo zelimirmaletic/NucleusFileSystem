@@ -67,23 +67,6 @@ int diskInitialize(int number)
     return 1;
 }
 
-//Determines true byte usage on emulated hard-drive expressed in percentiles
-float diskUsage()
-{
-    unsigned int counter = 0;
-    int temp;
-    for(int i=0;i<numberOfBlocks*DISK_BLOCK_SIZE;i++)
-    {
-        temp = getc(stream);
-        if(temp!=0)
-            counter++;
-    }
-    rewind(stream);
-    //Counter is now number of used b on hard-drive
-    float percentage = (float)counter/(numberOfBlocks*DISK_BLOCK_SIZE);
-    return percentage*100;
-}
-
 //Functions for determining disk size
 int diskSize(){ return numberOfBlocks; }
 int diskSizeB(){ return numberOfBlocks*DISK_BLOCK_SIZE; }
