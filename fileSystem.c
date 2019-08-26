@@ -671,6 +671,11 @@ short folderExists(char *folderName)
 
 short fileExists(char *fileName, char *currentAbsoluteAdress)
 {
+    if(isMounted!=1)
+    {
+        printf("ERROR: You have to mount file system first!\n");
+        return 2;
+    }
     for(int i=0;i<=superblock.numberOfInodeBlocks;++i)
     {
         if(freeBlocksBitmap[i]=='1')
@@ -759,41 +764,117 @@ void updateAbsoluteAdress(char *name, char *destinationFolder)
 
 void downloadFile(char *fileName)
 {
-    if(!fileExists(fileName, currentAbsoluteAdress))
+    if(!isMounted)
     {
+        printf("ERROR: You have to mount file system first!\n");
+        return;
+    }
+    char newName[30];
+    strcat(newName, fileName);
+    strcat(newName,"(copy)\0");
+    if(fileExists(newName, currentAbsoluteAdress))
         printf("ERROR: File does not exist in current working directory.\n");
-        return;
-    }
-    diskReadStructure(findInodeByFIleName(fileName),1, 'i', &currentInode);
-    if(currentInode.fileType == 'd')
+    else
     {
-        printf("ERROR: You cannot download folder to main filesystem\n");
-        return;
-    }
-    FILE *outputStream;
-    outputStream = fopen(currentInode.fileName, 'a');
-    if(!outputStream)
-    {
-        printf("ERROR: Error in opening file for writing contence!\n");
-        return;
-    }
-    char *temp = calloc(DISK_BLOCK_SIZE, sizeof(char));
-    if(!currentInode.isExtent)
-    {
-        for(short i=0;i<POINTERS_PER_INODE;i++)
+        clearCurrentInode();
+        unsigned short inodeNumber = findInodeByFIleName(fileName);
+        diskReadStructure(superblock.inodeSegmentPointer+inodeNumber,1,'i',&currentInode);
+        FILE *outputStream = fopen(currentInode.fileName, "a");
+        char *temp=calloc(DISK_BLOCK_SIZE, sizeof(char));
+        if(currentInode.isExtent!=1)
         {
-            if((currentInode.directInodePointers)[i]!=0)
+            for(short i=0;i<POINTERS_PER_INODE;i++)
             {
-                diskRead(currentInode.directInodePointers[i], temp);
-                fwrite(temp,sizeof(char),DISK_BLOCK_SIZE, outputStream);
+                if((currentInode.directInodePointers)[i] != 0)
+                {
+                    diskRead((currentInode.directInodePointers)[i], temp);
+                    fputs(temp, outputStream);
+                }
             }
         }
+        else //for extent
+        {
+            for(short i=0;i<currentInode.extentLength;++i)
+            {
+                diskRead(*(currentInode.directInodePointers)+i,temp);
+                fputs(temp, outputStream);
+            }
+        }
+        free(temp);temp=NULL;
+        fclose(outputStream);
     }
+}
 
+void copyFile(char *fileName, char *adress)
+{
+    if(!isMounted)
+    {
+        printf("ERROR: You have to mount file system first!\n");
+        return;
+    }
+    if(fileExists(fileName, adress))
+        printf("ERROR: File copy alredy exists in current working directory.\n");
+    else
+    {
+        downloadFile(fileName);
+        putFile(fileName, adress,'c');
+    }
+}
 
-    fclose(outputStream);
-    free(temp);
-    temp=NULL;
+void putFile(char *fileName, char *adress, char isCopy)
+{
+    if(!isMounted)
+    {
+        printf("ERROR: You have to mount file system first!\n");
+        return;
+    }
+    FILE *inputStream = fopen(fileName, "r");
+    if(!inputStream)
+    {
+        printf("ERROR: File does not exist on main file system\n");
+        return;
+    }
+    else
+    {
+        unsigned int counter = 0;
+        char c;
+        while(c!=EOF)
+        {
+            c=fgetc(inputStream);
+            ++counter;
+        }
+        if(counter>64*1024)
+        {
+            printf("ERROR: Maximal file size on Nucleus File System is 64 KiB\n");
+            return;
+        }
+        char *temp = calloc(counter, sizeof(char));
+        if(fileExists(fileName, adress))
+        {
+            printf("ERROR: File already exists\n");
+            return;
+        }
+        rewind(inputStream);
+        for(int i=0;i<counter;i++)
+            temp[i]=fgetc(inputStream);
+        if(isCopy=='c')
+        {
+            char *newName=calloc(30,sizeof(char));
+            strcat(newName, fileName);
+            strcat(newName,"(copy)\0");
+            createInode(newName,'f', adress);
+            fsWrite(findInodeByFIleName(newName), temp);
+            free(newName); newName =NULL;
+        }
+        else
+        {
+            createInode(fileName,'f', adress);
+            fsWrite(findInodeByFIleName(fileName), temp);
+        }
+        free(temp);
+        rewind(inputStream);
+    }
+    fclose(inputStream);
 }
 
 //Determines block usage on emulated hard-drive expressed in percentiles
@@ -806,7 +887,7 @@ float diskUsage()
         if(*(freeBlocksBitmap+i)=='1')
             counter++;
     }
-    //Counter is now number of used b on hard-drive
+    //Counter is now number of used blocks on hard-drive
     float percentage = (float)counter/(superblock.numberOfBlocks);
     return percentage*100;
 }

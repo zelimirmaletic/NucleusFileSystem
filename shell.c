@@ -57,6 +57,10 @@ short getCommandNumber(const char *commandEntered)
         return 21;
     else if(!strcmp(commandEntered, "get"))
         return 22;
+    else if(!strcmp(commandEntered, "cp"))
+        return 23;
+    else if(!strcmp(commandEntered, "put"))
+        return 24;
     else
         return -1;
 }
@@ -108,8 +112,16 @@ int executeCommand(char *commandEntered)
                 break;
             case 8:
                 scanf("%s",name);
+                if(fileExists(name, currentAbsoluteAdress)==2)
+                {
+                    printf("ERROR: You have to mount file system first!\n");
+                    break;
+                }
                 if(fileExists(name, currentAbsoluteAdress))
+                {
                     printf("ERROR: File aready exists!\n");
+                    break;
+                }
                 else
                     createInode(name,'f', currentAbsoluteAdress);
                 break;
@@ -120,6 +132,11 @@ int executeCommand(char *commandEntered)
                 break;
             case 10:
                 scanf("%s", name);
+                if(!fileExists(name, currentAbsoluteAdress))
+                {
+                    printf("ERROR: File not found. Use command [ls] to see all files and folders\n");
+                    break;
+                }
                 fsRead(findInodeByFIleName(name));
                 break;
             case 11:
@@ -145,8 +162,11 @@ int executeCommand(char *commandEntered)
                     printf("ERROR: Folder not found. Use command [ls] to see all folders on current absolute adress.\n");
                 break;
             case 13:
-                treeDepth--;
-                strcpy(currentAbsoluteAdress, "root/");
+                if(strcmp(currentAbsoluteAdress, "root/"))
+                {
+                    treeDepth--;
+                    strcpy(currentAbsoluteAdress, "root/");
+                }
                 break;
             case 14:
                 scanf("%s", name);
@@ -214,6 +234,22 @@ int executeCommand(char *commandEntered)
                 scanf("%s", name);
                 downloadFile(name);
                 break;
+            case 23:
+                scanf("%s", name);
+                gets(buffer);//into absolute adress
+                int i=0;
+                while(buffer[i])
+                    buffer[i++]=buffer[i];
+                copyFile(name, buffer);
+                break;
+            case 24:
+                scanf("%s", name);
+                gets(buffer);
+                i=0;
+                while(buffer[i])
+                    buffer[i++]=buffer[i];
+                putFile(name,buffer,'x');
+                break;
             case -1:
                 printf("ERROR:Command is not valid. \nPlease, take a look at help section by entering command: help\n");
                 break;
@@ -230,20 +266,27 @@ void printHelp(void)
     printf("[mount]         Mounts file system on already formatted disk\n");
     printf("[help]          Prints help menu with all available commands and their descripti\n\t\tons\n");
     printf("[exit]          Exits file system shell, and saves all changes to the disk\n");
+
     printf("[debug]         Shows internal structure of file system.\n");
     printf("[ls]            Lists all files and folders\n");
     printf("[ls-r]          Lists all files, folders and folder contence.\n");
     printf("[mkdir]         Makes new directory on current absolute adress. It should be fol\n\t\tlowed by space and folder name(max 30 char)\n");
     printf("[create]        Makes a new file on current absolute adress. It should be follow\n\t\ted by space and file name (max 30 char)\n");
+
     printf("[rename]        Renames file/folder. It should be followed by:space, old file/fo\n\t\tlder name, space, new file/folder name\n");
     printf("[cat]           Prints file contence. It should be followed by a valid file name\n");
     printf("[stat]          Prints inode that resresents selected file/folder with all meta\n\t\t data. Should be followed by: space, valid file/folder name\n");
     printf("[cd]            Changes the folder position.Should be followed by a valid folder\n\t\tmname\n");
     printf("[cd..]or[cd/..] Returns to root/ folder\n");
+
     printf("[echo]          Writes text to file.Should be followed by: valid file name, text\n\t\tdata\n");
     printf("[rm]            Removes a file from file system at the current position.\n");
     printf("[rm-r]          Removes folder with all files inside it.\n");
     printf("[pwd]           Show current working directory.\n");
+    printf("[get]           Downloads fil to main filesystem.\n");
+
+    printf("[put]           Uploads file to Nucleus FileSystem.\n");
+    printf("[cp]            Copy file to entered absolute adress.\n");
     printf("********************************************************************************\n");
 }
 

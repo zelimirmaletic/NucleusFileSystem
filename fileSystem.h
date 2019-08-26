@@ -85,6 +85,9 @@ void updateAbsoluteAdress(char *fileName, char *destinationFolder);
 short folderExists(char *folderName);
 short fileExists(char *fileName, char *currentAbsoluteAdress);
 void removeFolder(char *folderName);
+void downloadFile(char *fileName);
+void copyFile(char *fileName, char *adress);
+void putFile(char *name,char *adress, char isCopy);
 //TIME FUNCTION
 void getCurrentTime(char *outputPointer);
 void closeFileSystem();//Here we should release freeBlockBitmap and other dinamically allocated variables

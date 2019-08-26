@@ -128,7 +128,6 @@ void diskWrite(register int blockNumber,register const char *data)
     for(int i =0;i<length;++i)
         temp[i] = data[i];
     encrypt(temp);
-
     if(fwrite(temp, DISK_BLOCK_SIZE, 1, stream)==1)
         numberOfWrites++;
     else
